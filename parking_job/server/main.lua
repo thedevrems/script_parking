@@ -2,6 +2,26 @@ ESX = exports['es_extended']:getSharedObject()
 
 local JobParkings = {}
 
+-- Commande admin pour gérer les parkings (côté serveur pour sécurité)
+RegisterCommand(Config.AdminCommand, function(source, args, rawCommand)
+    local xPlayer = ESX.GetPlayerFromId(source)
+
+    if not xPlayer then return end
+
+    -- Vérifier les permissions
+    if xPlayer.getGroup() ~= Config.AdminGroup then
+        TriggerClientEvent('ox_lib:notify', source, {
+            title = 'Erreur',
+            description = Config.Notifications.noPermission,
+            type = 'error'
+        })
+        return
+    end
+
+    -- Envoyer un event au client pour ouvrir le menu
+    TriggerClientEvent('parking_job:openAdminMenu', source)
+end, false)
+
 -- Charger tous les parkings depuis la base de données
 local function LoadParkings()
     MySQL.query('SELECT * FROM job_parkings', {}, function(result)
@@ -92,13 +112,34 @@ lib.callback.register('parking_job:deleteParking', function(source, parkingId)
     return false, 'invalidData'
 end)
 
--- Récupérer tous les parkings
+-- Récupérer tous les parkings (pour le menu admin uniquement)
 lib.callback.register('parking_job:getParkings', function(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    if not xPlayer then return {} end
+
+    -- Vérifier les permissions
+    if xPlayer.getGroup() ~= Config.AdminGroup then
+        return {}
+    end
+
     return JobParkings
 end)
 
--- Récupérer tous les jobs disponibles
+-- Récupérer tous les parkings (pour tous les joueurs - polyzones)
+lib.callback.register('parking_job:getAllParkings', function(source)
+    return JobParkings
+end)
+
+-- Récupérer tous les jobs disponibles (réservé aux admins)
 lib.callback.register('parking_job:getJobs', function(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    if not xPlayer then return {} end
+
+    -- Vérifier les permissions
+    if xPlayer.getGroup() ~= Config.AdminGroup then
+        return {}
+    end
+
     local jobs = {}
     for jobName, jobData in pairs(ESX.Jobs) do
         table.insert(jobs, {

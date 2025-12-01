@@ -56,9 +56,9 @@ function CreateParkingZones()
     end
 end
 
--- Commande admin pour gérer les parkings
-RegisterCommand(Config.AdminCommand, function()
-    ESX.TriggerServerCallback('parking_job:getParkings', function(parkings)
+-- Event pour ouvrir le menu admin (envoyé par le serveur après vérification des permissions)
+RegisterNetEvent('parking_job:openAdminMenu', function()
+    lib.callback('parking_job:getParkings', false, function(parkings)
         JobParkings = parkings
         OpenAdminMenu()
     end)
@@ -411,10 +411,10 @@ function DrawText3D(x, y, z, text)
     end
 end
 
--- Charger les parkings au démarrage
+-- Charger les parkings au démarrage (accessible à tous pour les polyzones)
 CreateThread(function()
     Wait(2000)
-    lib.callback('parking_job:getParkings', false, function(parkings)
+    lib.callback('parking_job:getAllParkings', false, function(parkings)
         JobParkings = parkings
         CreateParkingZones()
     end)
