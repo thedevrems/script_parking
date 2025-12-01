@@ -1,6 +1,7 @@
 ESX = exports['es_extended']:getSharedObject()
 
 local JobParkings = {}
+local ParkedVehiclesNetIds = {}
 
 -- Commande admin pour gérer les parkings (côté serveur pour sécurité)
 RegisterCommand(Config.AdminCommand, function(source, args, rawCommand)
@@ -151,7 +152,7 @@ lib.callback.register('parking_job:getJobs', function(source)
 end)
 
 -- Garer un véhicule
-lib.callback.register('parking_job:storeVehicle', function(source, plate, parkingName)
+lib.callback.register('parking_job:storeVehicle', function(source, plate, parkingName, vehicleCoords, netId)
     local xPlayer = ESX.GetPlayerFromId(source)
     if not xPlayer then return false end
 
@@ -172,13 +173,20 @@ lib.callback.register('parking_job:storeVehicle', function(source, plate, parkin
         return false, 'wrongJob'
     end
 
-    -- Mettre à jour le véhicule dans la base de données
+    -- Mettre à jour le véhicule dans la base de données avec ses coordonnées
     local garageName = Config.GaragePrefix .. parkingName
-    MySQL.update.await('UPDATE owned_vehicles SET garage = ?, jobGarage = ?, stored = 1 WHERE plate = ?', {
+    MySQL.update.await('UPDATE owned_vehicles SET garage = ?, jobGarage = ?, stored = 1, parking_coords = ? WHERE plate = ?', {
         garageName,
         parkingName,
+        json.encode(vehicleCoords),
         plate
     })
+
+    -- Ajouter le netId à la liste des véhicules garés
+    table.insert(ParkedVehiclesNetIds, netId)
+
+    -- Synchroniser avec tous les clients
+    TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
 
     -- Retirer le véhicule du système de persistence de qs-advancedgarages
     exports['qs-advancedgarages']:removeVehicleFromPersistent(plate)
@@ -186,8 +194,8 @@ lib.callback.register('parking_job:storeVehicle', function(source, plate, parkin
     return true, 'vehicleStored'
 end)
 
--- Récupérer un véhicule
-lib.callback.register('parking_job:retrieveVehicle', function(source, plate, parkingJob)
+-- Récupérer un véhicule (le véhicule reste spawn, on change juste son statut)
+lib.callback.register('parking_job:retrieveVehicle', function(source, plate, parkingJob, netId)
     local xPlayer = ESX.GetPlayerFromId(source)
     if not xPlayer then return false end
 
@@ -213,81 +221,73 @@ lib.callback.register('parking_job:retrieveVehicle', function(source, plate, par
         return false, 'wrongJob'
     end
 
-    -- Mettre à jour le véhicule dans la base de données
-    MySQL.update.await('UPDATE owned_vehicles SET garage = ?, stored = 0 WHERE plate = ?', {
+    -- Vérifier que le véhicule est bien garé
+    if vehicle.stored ~= 1 then
+        return false, 'invalidData'
+    end
+
+    -- Mettre à jour le véhicule dans la base de données (le rendre "sorti")
+    MySQL.update.await('UPDATE owned_vehicles SET garage = ?, stored = 0, parking_coords = NULL WHERE plate = ?', {
         'OUT',
         plate
     })
 
-    return true, 'vehicleRetrieved', vehicle
-end)
-
--- Récupérer les véhicules d'un parking
-lib.callback.register('parking_job:getParkingVehicles', function(source, parkingName)
-    local xPlayer = ESX.GetPlayerFromId(source)
-    if not xPlayer then return {} end
-
-    -- Trouver le parking pour vérifier le job
-    local parking = nil
-    for id, p in pairs(JobParkings) do
-        if p.name == parkingName then
-            parking = p
+    -- Retirer le netId de la liste des véhicules garés
+    for i = #ParkedVehiclesNetIds, 1, -1 do
+        if ParkedVehiclesNetIds[i] == netId then
+            table.remove(ParkedVehiclesNetIds, i)
             break
         end
     end
 
-    -- Vérifier que le parking existe
-    if not parking then return {} end
+    -- Synchroniser avec tous les clients
+    TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
 
-    -- Vérifier que le joueur a le bon job
-    if xPlayer.job.name ~= parking.job then
-        return {}
-    end
-
-    local garageName = Config.GaragePrefix .. parkingName
-    local vehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage = ? AND stored = 1', {parkingName})
-
-    return vehicles or {}
+    return true, 'vehicleRetrieved'
 end)
 
--- Spawn des véhicules au démarrage
+-- Spawn des véhicules garés au démarrage
 CreateThread(function()
     Wait(5000) -- Attendre que les autres ressources soient chargées
 
-    local vehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage != "" AND stored = 0 AND garage = "OUT"', {})
+    -- Récupérer tous les véhicules garés (stored = 1)
+    local vehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage != "" AND stored = 1 AND parking_coords IS NOT NULL', {})
 
     if vehicles then
         for i = 1, #vehicles do
             local vehicle = vehicles[i]
-            local parkingName = vehicle.jobGarage
 
-            -- Trouver le parking correspondant
-            for id, parking in pairs(JobParkings) do
-                if parking.name == parkingName then
-                    -- Spawn le véhicule
-                    local coords = parking.coords
-                    local spawnCoords = vector4(coords.x, coords.y, coords.z, parking.heading)
+            -- Décoder les coordonnées de parking
+            local parkingCoords = json.decode(vehicle.parking_coords)
 
-                    local vehicleProps = json.decode(vehicle.vehicle)
+            if parkingCoords then
+                local spawnCoords = vector4(parkingCoords.x, parkingCoords.y, parkingCoords.z, parkingCoords.heading)
+                local vehicleProps = json.decode(vehicle.vehicle)
 
-                    -- Utiliser l'export de qs-advancedgarages pour spawn le véhicule
-                    exports['qs-advancedgarages']:SpawnVehicle(
-                        vehicle.id,
-                        vehicle.owner,
-                        vehicle.type,
-                        spawnCoords,
-                        vehicleProps,
-                        nil,
-                        false
-                    )
+                -- Utiliser l'export de qs-advancedgarages pour spawn le véhicule
+                local netId = exports['qs-advancedgarages']:SpawnVehicle(
+                    vehicle.id,
+                    vehicle.owner,
+                    vehicle.type,
+                    spawnCoords,
+                    vehicleProps,
+                    nil,
+                    false
+                )
 
-                    Wait(100) -- Petite pause entre chaque spawn
-                    break
+                if netId then
+                    table.insert(ParkedVehiclesNetIds, netId)
                 end
+
+                Wait(100) -- Petite pause entre chaque spawn
             end
         end
 
-        print('^2[Job Parking]^0 Spawned ' .. #vehicles .. ' job vehicle(s)')
+        print('^2[Job Parking]^0 Spawned ' .. #vehicles .. ' parked job vehicle(s)')
+
+        -- Envoyer les netIds aux clients après un délai
+        Wait(2000)
+        TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
     end
 end)
 
@@ -340,6 +340,10 @@ end)
 -- Event pour envoyer les parkings aux joueurs qui se connectent
 RegisterNetEvent('esx:playerLoaded', function(playerId, xPlayer)
     TriggerClientEvent('parking_job:updateParkings', playerId, JobParkings)
+
+    -- Envoyer aussi la liste des véhicules garés
+    Wait(1000)
+    TriggerClientEvent('parking_job:syncParkedVehicles', playerId, ParkedVehiclesNetIds)
 end)
 
 -- Note: Les vérifications de job se font côté serveur dans les callbacks

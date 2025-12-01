@@ -11,3 +11,7 @@ CREATE TABLE IF NOT EXISTS `job_parkings` (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+-- Ajouter une colonne pour stocker les coordonnées de parking des véhicules
+ALTER TABLE `owned_vehicles` ADD COLUMN IF NOT EXISTS `parking_coords` longtext DEFAULT NULL;
+
