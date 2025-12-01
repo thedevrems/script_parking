@@ -37,11 +37,10 @@ Config.Debug = false -- Mode debug (affiche les polyzones)
 
 Assurez-vous d'avoir installé :
 - es_extended
-- ox_lib
+- ox_lib (zones intégrées)
 - oxmysql
 - ox_target
 - qs-advancedgarages
-- PolyZone
 
 ### 4. Server.cfg
 

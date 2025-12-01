@@ -23,34 +23,26 @@ end)
 function CreateParkingZones()
     -- Supprimer les anciennes zones
     for i = 1, #ParkingZones do
-        ParkingZones[i]:destroy()
+        ParkingZones[i]:remove()
     end
     ParkingZones = {}
 
-    -- Créer les nouvelles zones
+    -- Créer les nouvelles zones avec ox_lib
     for id, parking in pairs(JobParkings) do
-        local zone = BoxZone:Create(
-            vector3(parking.coords.x, parking.coords.y, parking.coords.z),
-            parking.size.x,
-            parking.size.y,
-            {
-                name = 'job_parking_' .. parking.name,
-                heading = parking.heading,
-                debugPoly = Config.Debug,
-                minZ = parking.coords.z - 1.0,
-                maxZ = parking.coords.z + parking.height
-            }
-        )
-
-        zone:onPlayerInOut(function(isPointInside)
-            if isPointInside then
+        local zone = lib.zones.box({
+            coords = vec3(parking.coords.x, parking.coords.y, parking.coords.z),
+            size = vec3(parking.size.x, parking.size.y, parking.height),
+            rotation = parking.heading,
+            debug = Config.Debug,
+            onEnter = function()
                 CurrentParking = parking
-            else
+            end,
+            onExit = function()
                 if CurrentParking and CurrentParking.id == parking.id then
                     CurrentParking = nil
                 end
             end
-        end)
+        })
 
         table.insert(ParkingZones, zone)
     end
@@ -254,18 +246,12 @@ end
 
 -- Créer une zone de prévisualisation
 function CreatePreviewZone()
-    local previewZone = BoxZone:Create(
-        vector3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
-        CreationData.size.x,
-        CreationData.size.y,
-        {
-            name = 'preview_zone',
-            heading = CreationData.heading,
-            debugPoly = true,
-            minZ = CreationData.coords.z - 1.0,
-            maxZ = CreationData.coords.z + CreationData.height
-        }
-    )
+    local previewZone = lib.zones.box({
+        coords = vec3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
+        size = vec3(CreationData.size.x, CreationData.size.y, CreationData.height),
+        rotation = CreationData.heading,
+        debug = true
+    })
 
     -- Thread pour gérer les contrôles
     CreateThread(function()
@@ -278,7 +264,7 @@ function CreatePreviewZone()
             -- Valider avec ENTER
             if IsControlJustPressed(0, 191) then -- ENTER
                 InCreationMode = false
-                previewZone:destroy()
+                previewZone:remove()
 
                 -- Envoyer au serveur
                 lib.callback('parking_job:createParking', false, function(success, message)
@@ -303,7 +289,7 @@ function CreatePreviewZone()
             -- Annuler avec BACKSPACE
             if IsControlJustPressed(0, 194) then -- BACKSPACE
                 InCreationMode = false
-                previewZone:destroy()
+                previewZone:remove()
 
                 lib.notify({
                     title = 'Annulé',
@@ -317,70 +303,46 @@ function CreatePreviewZone()
             -- Déplacer avec les flèches
             if IsControlPressed(0, 172) then -- ARROW UP
                 CreationData.coords.y = CreationData.coords.y + 0.1
-                previewZone:destroy()
-                previewZone = BoxZone:Create(
-                    vector3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
-                    CreationData.size.x,
-                    CreationData.size.y,
-                    {
-                        name = 'preview_zone',
-                        heading = CreationData.heading,
-                        debugPoly = true,
-                        minZ = CreationData.coords.z - 1.0,
-                        maxZ = CreationData.coords.z + CreationData.height
-                    }
-                )
+                previewZone:remove()
+                previewZone = lib.zones.box({
+                    coords = vec3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
+                    size = vec3(CreationData.size.x, CreationData.size.y, CreationData.height),
+                    rotation = CreationData.heading,
+                    debug = true
+                })
             end
 
             if IsControlPressed(0, 173) then -- ARROW DOWN
                 CreationData.coords.y = CreationData.coords.y - 0.1
-                previewZone:destroy()
-                previewZone = BoxZone:Create(
-                    vector3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
-                    CreationData.size.x,
-                    CreationData.size.y,
-                    {
-                        name = 'preview_zone',
-                        heading = CreationData.heading,
-                        debugPoly = true,
-                        minZ = CreationData.coords.z - 1.0,
-                        maxZ = CreationData.coords.z + CreationData.height
-                    }
-                )
+                previewZone:remove()
+                previewZone = lib.zones.box({
+                    coords = vec3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
+                    size = vec3(CreationData.size.x, CreationData.size.y, CreationData.height),
+                    rotation = CreationData.heading,
+                    debug = true
+                })
             end
 
             if IsControlPressed(0, 174) then -- ARROW LEFT
                 CreationData.coords.x = CreationData.coords.x - 0.1
-                previewZone:destroy()
-                previewZone = BoxZone:Create(
-                    vector3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
-                    CreationData.size.x,
-                    CreationData.size.y,
-                    {
-                        name = 'preview_zone',
-                        heading = CreationData.heading,
-                        debugPoly = true,
-                        minZ = CreationData.coords.z - 1.0,
-                        maxZ = CreationData.coords.z + CreationData.height
-                    }
-                )
+                previewZone:remove()
+                previewZone = lib.zones.box({
+                    coords = vec3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
+                    size = vec3(CreationData.size.x, CreationData.size.y, CreationData.height),
+                    rotation = CreationData.heading,
+                    debug = true
+                })
             end
 
             if IsControlPressed(0, 175) then -- ARROW RIGHT
                 CreationData.coords.x = CreationData.coords.x + 0.1
-                previewZone:destroy()
-                previewZone = BoxZone:Create(
-                    vector3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
-                    CreationData.size.x,
-                    CreationData.size.y,
-                    {
-                        name = 'preview_zone',
-                        heading = CreationData.heading,
-                        debugPoly = true,
-                        minZ = CreationData.coords.z - 1.0,
-                        maxZ = CreationData.coords.z + CreationData.height
-                    }
-                )
+                previewZone:remove()
+                previewZone = lib.zones.box({
+                    coords = vec3(CreationData.coords.x, CreationData.coords.y, CreationData.coords.z),
+                    size = vec3(CreationData.size.x, CreationData.size.y, CreationData.height),
+                    rotation = CreationData.heading,
+                    debug = true
+                })
             end
         end
     end)
