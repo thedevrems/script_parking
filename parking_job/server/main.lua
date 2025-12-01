@@ -186,6 +186,23 @@ lib.callback.register('parking_job:getParkingVehicles', function(source, parking
     local xPlayer = ESX.GetPlayerFromId(source)
     if not xPlayer then return {} end
 
+    -- Trouver le parking pour vérifier le job
+    local parking = nil
+    for id, p in pairs(JobParkings) do
+        if p.name == parkingName then
+            parking = p
+            break
+        end
+    end
+
+    -- Vérifier que le parking existe
+    if not parking then return {} end
+
+    -- Vérifier que le joueur a le bon job
+    if xPlayer.job.name ~= parking.job then
+        return {}
+    end
+
     local garageName = Config.GaragePrefix .. parkingName
     local vehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage = ? AND stored = 1', {parkingName})
 
@@ -278,3 +295,12 @@ AddEventHandler('onResourceStart', function(resourceName)
         TriggerClientEvent('parking_job:updateParkings', -1, JobParkings)
     end
 end)
+
+-- Event pour envoyer les parkings aux joueurs qui se connectent
+RegisterNetEvent('esx:playerLoaded', function(playerId, xPlayer)
+    TriggerClientEvent('parking_job:updateParkings', playerId, JobParkings)
+end)
+
+-- Note: Les vérifications de job se font côté serveur dans les callbacks
+-- Cela permet de gérer automatiquement les changements de job sans événements supplémentaires
+-- À chaque action (garer/récupérer), le job du joueur est vérifié en temps réel

@@ -3,7 +3,6 @@ ESX = exports['es_extended']:getSharedObject()
 local JobParkings = {}
 local ParkingZones = {}
 local CurrentParking = nil
-local PlayerData = {}
 local InCreationMode = false
 local CreationData = {
     coords = nil,
@@ -13,16 +12,6 @@ local CreationData = {
     job = nil,
     name = nil
 }
-
--- Event pour mettre à jour le job du joueur
-RegisterNetEvent('esx:playerLoaded', function(xPlayer)
-    PlayerData = xPlayer
-end)
-
-RegisterNetEvent('esx:setJob', function(job)
-    PlayerData.job = job
-    RefreshZones()
-end)
 
 -- Recevoir les parkings depuis le serveur
 RegisterNetEvent('parking_job:updateParkings', function(parkings)
@@ -65,11 +54,6 @@ function CreateParkingZones()
 
         table.insert(ParkingZones, zone)
     end
-end
-
--- Rafraîchir les zones (utile quand le job change)
-function RefreshZones()
-    CreateParkingZones()
 end
 
 -- Commande admin pour gérer les parkings

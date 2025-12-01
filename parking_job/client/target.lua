@@ -37,11 +37,6 @@ exports.ox_target:addGlobalVehicle({
             -- Vérifier qu'on est dans une zone de parking
             if not CurrentParking then return false end
 
-            -- Vérifier que le joueur a le bon job
-            if not PlayerData.job or PlayerData.job.name ~= CurrentParking.job then
-                return false
-            end
-
             -- Vérifier que le joueur est dans le véhicule
             local playerPed = PlayerPedId()
             local vehicle = GetVehiclePedIsIn(playerPed, false)
@@ -113,14 +108,6 @@ function CreateVehicleRetrievalZones()
                     label = 'Récupérer un véhicule',
                     icon = 'fa-solid fa-car',
                     distance = Config.InteractionDistance,
-                    canInteract = function(entity, distance, coords, name, bone)
-                        -- Vérifier que le joueur a le bon job
-                        if not PlayerData.job or PlayerData.job.name ~= parking.job then
-                            return false
-                        end
-
-                        return true
-                    end,
                     onSelect = function()
                         OpenVehicleList(parking)
                     end
