@@ -240,10 +240,8 @@ lib.callback.register('parking_job:retrieveVehicle', function(source, plate, par
     return true, 'vehicleRetrieved'
 end)
 
--- Spawn des véhicules garés au démarrage
-CreateThread(function()
-    Wait(5000) -- Attendre que les autres ressources soient chargées
-
+-- Fonction pour spawn les véhicules garés
+local function SpawnParkedVehicles()
     -- Récupérer tous les véhicules garés (stored = 1)
     local vehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage != "" AND stored = 1 AND parking_coords IS NOT NULL', {})
 
@@ -279,11 +277,10 @@ CreateThread(function()
 
         print('^2[Job Parking]^0 Spawned ' .. #vehicles .. ' parked job vehicle(s)')
 
-        -- Envoyer les netIds aux clients après un délai
-        Wait(2000)
+        -- Envoyer les netIds aux clients
         TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
     end
-end)
+end
 
 -- Fonction pour donner les clés
 function GiveKeys(source, plate)
@@ -317,16 +314,19 @@ RegisterNetEvent('parking_job:removeKeys', function(plate)
     RemoveKeys(source, plate)
 end)
 
--- Charger les parkings au démarrage
-CreateThread(function()
-    Wait(1000)
-    LoadParkings()
-end)
-
--- Event pour mettre à jour les parkings côté client
+-- Event pour charger les parkings et véhicules au démarrage
 AddEventHandler('onResourceStart', function(resourceName)
     if GetCurrentResourceName() == resourceName then
-        Wait(2000)
+        -- Charger les parkings depuis la base de données
+        Wait(1000)
+        LoadParkings()
+
+        -- Attendre que les autres ressources soient chargées puis spawner les véhicules
+        Wait(4000)
+        SpawnParkedVehicles()
+
+        -- Envoyer les parkings aux clients déjà connectés
+        Wait(1000)
         TriggerClientEvent('parking_job:updateParkings', -1, JobParkings)
     end
 end)

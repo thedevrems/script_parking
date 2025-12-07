@@ -153,6 +153,8 @@ exports.ox_target:addGlobalVehicle({
 })
 
 -- Event pour synchroniser les véhicules garés
+-- Cet événement reconstruit la liste des véhicules garés depuis la source autoritaire (serveur)
+-- et nettoie automatiquement les véhicules qui n'existent plus
 RegisterNetEvent('parking_job:syncParkedVehicles', function(parkedVehicles)
     ParkedVehicles = {}
 
@@ -165,19 +167,6 @@ RegisterNetEvent('parking_job:syncParkedVehicles', function(parkedVehicles)
 
             -- Verrouiller le véhicule garé
             SetVehicleDoorsLocked(vehicle, 2)
-        end
-    end
-end)
-
--- Nettoyer les véhicules garés qui n'existent plus
-CreateThread(function()
-    while true do
-        Wait(5000)
-
-        for vehicle, netId in pairs(ParkedVehicles) do
-            if not DoesEntityExist(vehicle) then
-                ParkedVehicles[vehicle] = nil
-            end
         end
     end
 end)

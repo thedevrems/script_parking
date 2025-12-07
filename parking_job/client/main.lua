@@ -480,11 +480,5 @@ function DrawText3D(x, y, z, text)
     end
 end
 
--- Charger les parkings au démarrage (accessible à tous pour les polyzones)
-CreateThread(function()
-    Wait(2000)
-    lib.callback('parking_job:getAllParkings', false, function(parkings)
-        JobParkings = parkings
-        CreateParkingZones()
-    end)
-end)
+-- Les parkings sont chargés automatiquement via l'événement 'parking_job:updateParkings'
+-- envoyé par le serveur au démarrage de la ressource et à la connexion du joueur
