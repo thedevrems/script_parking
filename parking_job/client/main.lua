@@ -235,19 +235,9 @@ function CreatePreviewZone()
             local playerPed = PlayerPedId()
             local coords = GetEntityCoords(playerPed)
 
-            -- Afficher les informations du parking (en haut)
-            local infoText = '~b~=== CRÉATION DE PARKING ===~w~'
-            infoText = infoText .. '\n~g~Nom: ~w~' .. CreationData.name
-            infoText = infoText .. '\n~g~Job: ~w~' .. CreationData.job
-            infoText = infoText .. '\n~g~Hauteur: ~w~' .. string.format("%.1f", CreationData.height) .. 'm'
-            infoText = infoText .. '\n~g~Points: ~w~' .. #CreationData.points
-
-            DrawText3D(coords.x, coords.y, coords.z + 2.5, infoText)
-
             -- Afficher les contrôles (en bas)
             local controlsText = '~y~[E]~w~ Placer  ~y~[SUPPR]~w~ Retirer'
-            controlsText = controlsText .. '\n~y~[↑/↓]~w~ Hauteur  ~g~[ENTER]~w~ Valider'
-            controlsText = controlsText .. '\n~r~[BACKSPACE]~w~ Annuler'
+            controlsText = controlsText .. '\n~y~[UP/DOWN]~w~ Hauteur  ~g~[ENTER]~w~ Valider'
 
             DrawText3D(coords.x, coords.y, coords.z + 1.0, controlsText)
 
