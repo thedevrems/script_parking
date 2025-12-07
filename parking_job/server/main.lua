@@ -33,10 +33,8 @@ local function LoadParkings()
                     id = parking.id,
                     name = parking.name,
                     job = parking.job,
-                    coords = json.decode(parking.coords),
-                    size = json.decode(parking.size),
-                    height = parking.height,
-                    heading = parking.heading
+                    points = json.decode(parking.points),
+                    height = parking.height
                 }
             end
             print('^2[Job Parking]^0 Loaded ' .. #result .. ' parking(s)')
@@ -61,13 +59,11 @@ lib.callback.register('parking_job:createParking', function(source, data)
     end
 
     -- Insérer dans la base de données
-    local insertId = MySQL.insert.await('INSERT INTO job_parkings (name, job, coords, size, height, heading) VALUES (?, ?, ?, ?, ?, ?)', {
+    local insertId = MySQL.insert.await('INSERT INTO job_parkings (name, job, points, height) VALUES (?, ?, ?, ?)', {
         data.name,
         data.job,
-        json.encode(data.coords),
-        json.encode(data.size),
-        data.height,
-        data.heading
+        json.encode(data.points),
+        data.height
     })
 
     if insertId then
@@ -75,10 +71,8 @@ lib.callback.register('parking_job:createParking', function(source, data)
             id = insertId,
             name = data.name,
             job = data.job,
-            coords = data.coords,
-            size = data.size,
-            height = data.height,
-            heading = data.heading
+            points = data.points,
+            height = data.height
         }
 
         -- Notifier tous les clients
