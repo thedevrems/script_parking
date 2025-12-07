@@ -215,10 +215,10 @@ function StartParkingCreation()
         CreatePreviewZone()
 
         lib.notify({
-            title = 'Mode création',
-            description = 'Appuyez sur E pour placer un point. Minimum 3 points. ENTER pour valider, BACKSPACE pour annuler.',
+            title = 'Mode création activé',
+            description = 'E: Placer | SUPPR: Retirer | ↑/↓: Hauteur | ENTER: Valider | BACKSPACE: Annuler',
             type = 'info',
-            duration = 8000
+            duration = 10000
         })
     end)
 end
@@ -235,11 +235,20 @@ function CreatePreviewZone()
             local playerPed = PlayerPedId()
             local coords = GetEntityCoords(playerPed)
 
-            -- Afficher les instructions
-            local instructionText = '~g~Parking: ~w~' .. CreationData.name .. '\n~g~Job: ~w~' .. CreationData.job .. '\n~g~Points placés: ~w~' .. #CreationData.points
-            instructionText = instructionText .. '\n~y~[E]~w~ Placer un point | ~y~[ENTER]~w~ Valider | ~r~[BACKSPACE]~w~ Annuler'
+            -- Afficher les instructions détaillées
+            local instructionText = '~b~=== CRÉATION DE PARKING ===~w~'
+            instructionText = instructionText .. '\n~g~Nom: ~w~' .. CreationData.name
+            instructionText = instructionText .. '\n~g~Job: ~w~' .. CreationData.job
+            instructionText = instructionText .. '\n~g~Hauteur: ~w~' .. string.format("%.1f", CreationData.height) .. 'm'
+            instructionText = instructionText .. '\n~g~Points placés: ~w~' .. #CreationData.points
+            instructionText = instructionText .. '\n'
+            instructionText = instructionText .. '\n~y~[E]~w~ Placer un point'
+            instructionText = instructionText .. '\n~y~[SUPPR]~w~ Supprimer dernier point'
+            instructionText = instructionText .. '\n~y~[↑/↓]~w~ Ajuster hauteur (±0.1m)'
+            instructionText = instructionText .. '\n~g~[ENTER]~w~ Valider (min. 3 points)'
+            instructionText = instructionText .. '\n~r~[BACKSPACE]~w~ Annuler tout'
 
-            DrawText3D(coords.x, coords.y, coords.z + 1.0, instructionText)
+            DrawText3D(coords.x, coords.y, coords.z + 2.0, instructionText)
 
             -- Placer un point avec E
             if IsControlJustPressed(0, 38) then -- E
@@ -252,8 +261,9 @@ function CreatePreviewZone()
 
                 lib.notify({
                     title = 'Point ajouté',
-                    description = 'Point ' .. #CreationData.points .. ' placé',
-                    type = 'success'
+                    description = 'Point ' .. #CreationData.points .. ' placé aux coordonnées ' .. string.format("%.2f, %.2f, %.2f", coords.x, coords.y, coords.z),
+                    type = 'success',
+                    duration = 3000
                 })
 
                 -- Recréer la zone de prévisualisation si on a au moins 3 points
@@ -275,13 +285,103 @@ function CreatePreviewZone()
                 end
             end
 
+            -- Supprimer le dernier point avec SUPPR/DEL
+            if IsControlJustPressed(0, 178) then -- SUPPR/DEL
+                if #CreationData.points == 0 then
+                    lib.notify({
+                        title = 'Erreur',
+                        description = 'Aucun point à supprimer',
+                        type = 'error',
+                        duration = 3000
+                    })
+                else
+                    local removedPoint = table.remove(CreationData.points)
+                    lib.notify({
+                        title = 'Point supprimé',
+                        description = 'Point ' .. (#CreationData.points + 1) .. ' supprimé. Il reste ' .. #CreationData.points .. ' point(s)',
+                        type = 'warning',
+                        duration = 3000
+                    })
+
+                    -- Recréer la zone de prévisualisation
+                    if previewZone then
+                        previewZone:remove()
+                        previewZone = nil
+                    end
+
+                    if #CreationData.points >= 3 then
+                        local points = {}
+                        for i = 1, #CreationData.points do
+                            table.insert(points, vec3(CreationData.points[i].x, CreationData.points[i].y, CreationData.points[i].z))
+                        end
+
+                        previewZone = lib.zones.poly({
+                            points = points,
+                            thickness = CreationData.height,
+                            debug = true
+                        })
+                    end
+                end
+            end
+
+            -- Augmenter la hauteur avec FLÈCHE HAUT
+            if IsControlPressed(0, 172) then -- ARROW UP
+                CreationData.height = CreationData.height + 0.1
+                if CreationData.height > 10.0 then
+                    CreationData.height = 10.0
+                end
+
+                -- Recréer la zone si elle existe
+                if previewZone and #CreationData.points >= 3 then
+                    previewZone:remove()
+
+                    local points = {}
+                    for i = 1, #CreationData.points do
+                        table.insert(points, vec3(CreationData.points[i].x, CreationData.points[i].y, CreationData.points[i].z))
+                    end
+
+                    previewZone = lib.zones.poly({
+                        points = points,
+                        thickness = CreationData.height,
+                        debug = true
+                    })
+                end
+                Wait(100)
+            end
+
+            -- Diminuer la hauteur avec FLÈCHE BAS
+            if IsControlPressed(0, 173) then -- ARROW DOWN
+                CreationData.height = CreationData.height - 0.1
+                if CreationData.height < 1.0 then
+                    CreationData.height = 1.0
+                end
+
+                -- Recréer la zone si elle existe
+                if previewZone and #CreationData.points >= 3 then
+                    previewZone:remove()
+
+                    local points = {}
+                    for i = 1, #CreationData.points do
+                        table.insert(points, vec3(CreationData.points[i].x, CreationData.points[i].y, CreationData.points[i].z))
+                    end
+
+                    previewZone = lib.zones.poly({
+                        points = points,
+                        thickness = CreationData.height,
+                        debug = true
+                    })
+                end
+                Wait(100)
+            end
+
             -- Valider avec ENTER
             if IsControlJustPressed(0, 191) then -- ENTER
                 if #CreationData.points < 3 then
                     lib.notify({
                         title = 'Erreur',
-                        description = 'Vous devez placer au moins 3 points',
-                        type = 'error'
+                        description = 'Vous devez placer au moins 3 points pour créer une polyzone',
+                        type = 'error',
+                        duration = 5000
                     })
                 else
                     InCreationMode = false
@@ -294,8 +394,9 @@ function CreatePreviewZone()
                         if success then
                             lib.notify({
                                 title = 'Succès',
-                                description = Config.Notifications[message],
-                                type = 'success'
+                                description = Config.Notifications[message] .. ' (' .. #CreationData.points .. ' points, hauteur: ' .. CreationData.height .. 'm)',
+                                type = 'success',
+                                duration = 5000
                             })
                         else
                             lib.notify({
@@ -312,24 +413,39 @@ function CreatePreviewZone()
 
             -- Annuler avec BACKSPACE
             if IsControlJustPressed(0, 194) then -- BACKSPACE
-                InCreationMode = false
-                if previewZone then
-                    previewZone:remove()
-                end
-
-                lib.notify({
-                    title = 'Annulé',
-                    description = 'Création du parking annulée',
-                    type = 'error'
+                local confirm = lib.alertDialog({
+                    header = 'Annuler la création ?',
+                    content = 'Voulez-vous vraiment annuler la création de ce parking ? Tous les points seront perdus.',
+                    centered = true,
+                    cancel = true
                 })
 
-                CreationData = {points = {}, height = 2.0, job = nil, name = nil}
+                if confirm == 'confirm' then
+                    InCreationMode = false
+                    if previewZone then
+                        previewZone:remove()
+                    end
+
+                    lib.notify({
+                        title = 'Annulé',
+                        description = 'Création du parking annulée',
+                        type = 'error'
+                    })
+
+                    CreationData = {points = {}, height = 2.0, job = nil, name = nil}
+                end
             end
 
             -- Dessiner les markers pour chaque point placé
             for i = 1, #CreationData.points do
                 local point = CreationData.points[i]
-                DrawMarker(28, point.x, point.y, point.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.3, 0.3, 0, 255, 0, 200, false, true, 2, false, nil, nil, false)
+                -- Marker vert pour les points normaux
+                if i == #CreationData.points then
+                    -- Marker jaune pour le dernier point placé
+                    DrawMarker(28, point.x, point.y, point.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.4, 0.4, 255, 255, 0, 200, false, true, 2, false, nil, nil, false)
+                else
+                    DrawMarker(28, point.x, point.y, point.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.3, 0.3, 0, 255, 0, 200, false, true, 2, false, nil, nil, false)
+                end
                 DrawText3D(point.x, point.y, point.z + 0.5, '~g~Point ' .. i)
             end
 
@@ -341,6 +457,9 @@ function CreatePreviewZone()
                     DrawLine(point1.x, point1.y, point1.z, point2.x, point2.y, point2.z, 0, 255, 0, 255)
                 end
             end
+
+            -- Dessiner un marker à la position actuelle du joueur pour prévisualiser où sera placé le prochain point
+            DrawMarker(1, coords.x, coords.y, coords.z - 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 255, 255, 255, 100, false, true, 2, false, nil, nil, false)
         end
     end)
 end
