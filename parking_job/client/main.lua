@@ -235,20 +235,21 @@ function CreatePreviewZone()
             local playerPed = PlayerPedId()
             local coords = GetEntityCoords(playerPed)
 
-            -- Afficher les instructions détaillées
-            local instructionText = '~b~=== CRÉATION DE PARKING ===~w~'
-            instructionText = instructionText .. '\n~g~Nom: ~w~' .. CreationData.name
-            instructionText = instructionText .. '\n~g~Job: ~w~' .. CreationData.job
-            instructionText = instructionText .. '\n~g~Hauteur: ~w~' .. string.format("%.1f", CreationData.height) .. 'm'
-            instructionText = instructionText .. '\n~g~Points placés: ~w~' .. #CreationData.points
-            instructionText = instructionText .. '\n'
-            instructionText = instructionText .. '\n~y~[E]~w~ Placer un point'
-            instructionText = instructionText .. '\n~y~[SUPPR]~w~ Supprimer dernier point'
-            instructionText = instructionText .. '\n~y~[↑/↓]~w~ Ajuster hauteur (±0.1m)'
-            instructionText = instructionText .. '\n~g~[ENTER]~w~ Valider (min. 3 points)'
-            instructionText = instructionText .. '\n~r~[BACKSPACE]~w~ Annuler tout'
+            -- Afficher les informations du parking (en haut)
+            local infoText = '~b~=== CRÉATION DE PARKING ===~w~'
+            infoText = infoText .. '\n~g~Nom: ~w~' .. CreationData.name
+            infoText = infoText .. '\n~g~Job: ~w~' .. CreationData.job
+            infoText = infoText .. '\n~g~Hauteur: ~w~' .. string.format("%.1f", CreationData.height) .. 'm'
+            infoText = infoText .. '\n~g~Points: ~w~' .. #CreationData.points
 
-            DrawText3D(coords.x, coords.y, coords.z + 2.0, instructionText)
+            DrawText3D(coords.x, coords.y, coords.z + 2.5, infoText)
+
+            -- Afficher les contrôles (en bas)
+            local controlsText = '~y~[E]~w~ Placer  ~y~[SUPPR]~w~ Retirer'
+            controlsText = controlsText .. '\n~y~[↑/↓]~w~ Hauteur  ~g~[ENTER]~w~ Valider'
+            controlsText = controlsText .. '\n~r~[BACKSPACE]~w~ Annuler'
+
+            DrawText3D(coords.x, coords.y, coords.z + 1.0, controlsText)
 
             -- Placer un point avec E
             if IsControlJustPressed(0, 38) then -- E
