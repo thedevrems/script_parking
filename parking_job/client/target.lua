@@ -13,12 +13,6 @@ exports.ox_target:addGlobalVehicle({
             -- Vérifier qu'on est dans une zone de parking
             if not CurrentParking then return false end
 
-            -- Vérifier que le joueur est dans le véhicule
-            local playerPed = PlayerPedId()
-            local vehicle = GetVehiclePedIsIn(playerPed, false)
-
-            if vehicle ~= entity then return false end
-
             -- Vérifier que le véhicule n'est pas déjà garé
             if ParkedVehicles[entity] then return false end
 
@@ -39,12 +33,6 @@ exports.ox_target:addGlobalVehicle({
 
             -- Retirer les espaces de la plaque
             plate = plate:gsub("%s+", "")
-
-            -- Faire sortir le joueur du véhicule
-            local playerPed = PlayerPedId()
-            TaskLeaveVehicle(playerPed, vehicle, 0)
-
-            Wait(2000)
 
             -- Récupérer les coordonnées du véhicule
             local vehCoords = GetEntityCoords(vehicle)
