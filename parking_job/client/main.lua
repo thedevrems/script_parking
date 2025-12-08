@@ -259,12 +259,18 @@ function CreatePreviewZone()
         while InCreationMode do
             Wait(0)
 
+            -- Désactiver les contrôles conflictuels pendant la création (empêche interactions E)
+            DisableControlAction(0, 38, true) -- E (interaction)
+            DisableControlAction(0, 46, true) -- E (alternative)
+            DisableControlAction(0, 47, true) -- G
+            DisableControlAction(0, 74, true) -- H
+
             local playerPed = PlayerPedId()
             local coords = GetEntityCoords(playerPed)
 
             -- Afficher les contrôles (en bas)
             local controlsText = '~y~[E]~w~ Placer  ~y~[SUPPR]~w~ Retirer'
-            controlsText = controlsText .. '\n~y~[UP/DOWN]~w~ Hauteur  ~g~[ENTER]~w~ Valider'
+            controlsText = controlsText .. '\n~y~[UP/DOWN]~w~ Hauteur  ~g~[ENTER]~w~ Valider  ~r~[BACKSPACE]~w~ Annuler'
 
             DrawText3D(coords.x, coords.y, coords.z + 1.0, controlsText)
 
