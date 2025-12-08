@@ -1,5 +1,3 @@
-ESX = exports['es_extended']:getSharedObject()
-
 local JobParkings = {}
 local ParkedVehiclesNetIds = {}
 
@@ -252,24 +250,28 @@ local function SpawnParkedVehicles()
             local spawnCoords = vector3(parkingCoords.x, parkingCoords.y, parkingCoords.z)
 
             if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
-                local validVehicle, resultVehicle = SpawnVehicle(joaat(propsVehicle.model), spawnCoords, parkingCoords.heading)
+                local modelVehicle = GetVehicleModelName(propsVehicle.model)
 
-                if validVehicle and resultVehicle > 0 then
-                    -- Verrouiller le véhicule
-                    SetVehicleDoorsLocked(resultVehicle, 2)
+                if modelVehicle and modelVehicle ~= "unknown" then
+                    local validVehicle, resultVehicle = TrySpawnVehicle(modelVehicle, spawnCoords, parkingCoords.heading, 2)
 
-                    local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
-                    if netId > 0 then
-                        table.insert(ParkedVehiclesNetIds, netId)
+                    if validVehicle and resultVehicle > 0 then
+                        -- Verrouiller le véhicule
+                        SetVehicleDoorsLocked(resultVehicle, 2)
+
+                        local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
+                        if netId > 0 then
+                            table.insert(ParkedVehiclesNetIds, netId)
+                        end
+                        print("Véhicule a bien spawn")
+                    else
+                        print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
                     end
-                else
-                    print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
-                end
 
-                Wait(100) -- Petite pause entre chaque spawn
+                    Wait(100) -- Petite pause entre chaque spawn 
+                end
             end
         end
-
         print('^2[Job Parking]^0 Spawned ' .. #dataVehicles .. ' parked job vehicle(s)')
 
         -- Envoyer les netIds aux clients

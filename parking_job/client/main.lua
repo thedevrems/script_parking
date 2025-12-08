@@ -1,5 +1,3 @@
-ESX = exports['es_extended']:getSharedObject()
-
 local JobParkings = {}
 local ParkingZones = {}
 CurrentParking = nil -- Variable globale accessible depuis target.lua

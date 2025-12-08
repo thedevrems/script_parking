@@ -1,3 +1,22 @@
+function IsSpawnLocationAvailable(coords, radius)
+    radius = radius or 3.0
+
+    local vehicles = GetAllVehicles()
+
+    for _, vehicle in ipairs(vehicles) do
+        if DoesEntityExist(vehicle) then
+            local vehCoords = GetEntityCoords(vehicle)
+            local distance = #(vector3(coords.x, coords.y, coords.z) - vehCoords)
+
+            if distance < radius then
+                return false
+            end
+        end
+    end
+
+    return true
+end
+
 function SpawnVehicle(model, coords, heading)
     if not model or not coords or not heading then
         return false, "Incorrect parameters"
@@ -27,4 +46,12 @@ function SpawnVehicle(model, coords, heading)
     end
 
     return true, vehicle
+end
+
+function TrySpawnVehicle(name, coords, heading, radius)
+    if not IsSpawnLocationAvailable(coords, radius) then
+        return false, "Spawn location is blocked by another vehicle"
+    end
+
+    return SpawnVehicle(name, coords, heading)
 end
