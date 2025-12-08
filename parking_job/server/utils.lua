@@ -3,6 +3,9 @@ function SpawnVehicle(name, coords, heading)
         return false, "Incorrect parameters"
     end
 
+    print(name)
+    print(coords)
+    print(heading)
     local vehicle = CreateVehicle(name, coords.x, coords.y, coords.z, heading, true, true)
 
     local timeout = 0

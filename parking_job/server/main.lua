@@ -260,9 +260,6 @@ local function SpawnParkedVehicles()
                     local validVehicle, resultVehicle = SpawnVehicle(modelToSpawn, spawnCoords, parkingCoords.heading)
 
                     if validVehicle and resultVehicle > 0 then
-                        -- Appliquer les propriétés du véhicule (couleur, plaque, mods, etc.)
-                        ESX.SetVehicleProperties(resultVehicle, propsVehicle)
-
                         -- Verrouiller le véhicule
                         SetVehicleDoorsLocked(resultVehicle, 2)
 
