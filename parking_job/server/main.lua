@@ -252,6 +252,7 @@ local function SpawnParkedVehicles()
             if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
                 -- Convertir le hash du modèle en nom de modèle (string) car CreateVehicle côté serveur n'accepte que les strings
                 local modelName = GetVehicleModelName(propsVehicle.model)
+                print("^3[DEBUG]^0 Hash: " .. tostring(propsVehicle.model) .. " -> ModelName: " .. tostring(modelName))
 
                 if modelName == "unknown" then
                     print('^1[Job Parking Error]^0 Unknown vehicle model hash: ' .. tostring(propsVehicle.model))
