@@ -1,8 +1,8 @@
 local JobParkings = {}
 local ParkingZones = {}
+local ParkingSpawnPoints = {} -- Points de détection pour le spawn (1000m)
 CurrentParking = nil -- Variable globale accessible depuis target.lua
 local InCreationMode = false
-local ParkingsSpawnRequested = {} -- Flag local pour savoir si on a déjà demandé le spawn pour un parking
 local CreationData = {
     points = {},
     height = 2.0,
@@ -24,6 +24,12 @@ function CreateParkingZones()
     end
     ParkingZones = {}
 
+    -- Supprimer les anciens points de spawn
+    for i = 1, #ParkingSpawnPoints do
+        ParkingSpawnPoints[i]:remove()
+    end
+    ParkingSpawnPoints = {}
+
     -- Créer les nouvelles zones avec ox_lib
     for id, parking in pairs(JobParkings) do
         -- Convertir les points en format vec3
@@ -32,6 +38,7 @@ function CreateParkingZones()
             table.insert(points, vec3(parking.points[i].x, parking.points[i].y, parking.points[i].z))
         end
 
+        -- Créer la polyzone pour le parking
         local zone = lib.zones.poly({
             points = points,
             thickness = parking.height,
@@ -47,6 +54,35 @@ function CreateParkingZones()
         })
 
         table.insert(ParkingZones, zone)
+
+        -- Calculer le centre du parking
+        local centerX, centerY, centerZ = 0, 0, 0
+        local pointCount = #parking.points
+
+        for i = 1, pointCount do
+            centerX = centerX + parking.points[i].x
+            centerY = centerY + parking.points[i].y
+            centerZ = centerZ + parking.points[i].z
+        end
+
+        centerX = centerX / pointCount
+        centerY = centerY / pointCount
+        centerZ = centerZ / pointCount
+
+        -- Créer un point de détection à 1000m pour le spawn
+        local spawnPoint = lib.points.new({
+            coords = vec3(centerX, centerY, centerZ),
+            distance = 1000.0,
+            parkingName = parking.name,
+            onEnter = function(self)
+                -- Demander au serveur de spawner les véhicules de ce parking
+                TriggerServerEvent('parking_job:playerApproachingParking', self.parkingName)
+                -- Retirer le point après utilisation (on n'a besoin de spawner qu'une fois)
+                self:remove()
+            end
+        })
+
+        table.insert(ParkingSpawnPoints, spawnPoint)
     end
 end
 
@@ -479,43 +515,6 @@ function DrawText3D(x, y, z, text)
     end
 end
 
--- Thread pour détecter quand le joueur s'approche d'un parking et demander le spawn des véhicules
-CreateThread(function()
-    while true do
-        Wait(5000) -- Vérifier toutes les 5 secondes
-
-        local playerCoords = GetEntityCoords(PlayerPedId())
-
-        for id, parking in pairs(JobParkings) do
-            -- Vérifier si on a déjà demandé le spawn pour ce parking
-            if not ParkingsSpawnRequested[parking.name] then
-                -- Calculer le centre du parking (moyenne des points)
-                local centerX, centerY, centerZ = 0, 0, 0
-                local pointCount = #parking.points
-
-                for i = 1, pointCount do
-                    centerX = centerX + parking.points[i].x
-                    centerY = centerY + parking.points[i].y
-                    centerZ = centerZ + parking.points[i].z
-                end
-
-                centerX = centerX / pointCount
-                centerY = centerY / pointCount
-                centerZ = centerZ / pointCount
-
-                local parkingCenter = vector3(centerX, centerY, centerZ)
-                local distance = #(playerCoords - parkingCenter)
-
-                -- Si le joueur est à moins de 1000m du parking
-                if distance < 1000.0 then
-                    -- Demander au serveur de spawner les véhicules de ce parking
-                    TriggerServerEvent('parking_job:playerApproachingParking', parking.name)
-                    ParkingsSpawnRequested[parking.name] = true
-                end
-            end
-        end
-    end
-end)
-
 -- Les parkings sont chargés automatiquement via l'événement 'parking_job:updateParkings'
 -- envoyé par le serveur au démarrage de la ressource et à la connexion du joueur
+-- Les points de détection (lib.points) déclenchent automatiquement le spawn à 1000m
