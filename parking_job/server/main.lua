@@ -251,26 +251,35 @@ local function SpawnParkedVehicles()
             local propsVehicle = json.decode(dataVehicle.vehicle)
             local spawnCoords = vector3(parkingCoords.x, parkingCoords.y, parkingCoords.z)
 
-            if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
-                -- local spawnCoords = vector4(parkingCoords.x, parkingCoords.y, parkingCoords.z, parkingCoords.heading)
-                -- local vehicleProps = json.decode(vehicle.vehicle)
-                
-                local validVehicle, resultVehicle = SpawnVehicle(propsVehicle.model, spawnCoords, parkingCoords.heading)
+            if parkingCoords and propsVehicle and spawnCoords and parkingCoords.heading then
+                -- Déterminer le modèle à utiliser
+                -- Priorité : dataVehicle.model (nom string) > propsVehicle.model (hash)
+                local modelToSpawn = dataVehicle.model or propsVehicle.model
 
-                if validVehicle and resultVehicle > 0 then
-                    local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
-                    if netId > 0 then
-                        table.insert(ParkedVehiclesNetIds, netId)
+                if modelToSpawn then
+                    local validVehicle, resultVehicle = SpawnVehicle(modelToSpawn, spawnCoords, parkingCoords.heading)
+
+                    if validVehicle and resultVehicle > 0 then
+                        -- Appliquer les propriétés du véhicule (couleur, plaque, mods, etc.)
+                        ESX.SetVehicleProperties(resultVehicle, propsVehicle)
+
+                        -- Verrouiller le véhicule
+                        SetVehicleDoorsLocked(resultVehicle, 2)
+
+                        local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
+                        if netId > 0 then
+                            table.insert(ParkedVehiclesNetIds, netId)
+                        end
+                    else
+                        print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
                     end
-                else 
-                    print(resultVehicle)
-                end
 
-                Wait(100) -- Petite pause entre chaque spawn
+                    Wait(100) -- Petite pause entre chaque spawn
+                end
             end
         end
 
-        print('^2[Job Parking]^0 Spawned ' .. #vehicles .. ' parked job vehicle(s)')
+        print('^2[Job Parking]^0 Spawned ' .. #dataVehicles .. ' parked job vehicle(s)')
 
         -- Envoyer les netIds aux clients
         TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
