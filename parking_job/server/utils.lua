@@ -22,13 +22,21 @@ function SpawnVehicle(model, coords, heading)
         return false, "Incorrect parameters"
     end
 
+    print("^3[DEBUG]^0 Attempting to spawn vehicle:")
+    print("  Model: " .. tostring(model) .. " (type: " .. type(model) .. ")")
+    print("  Coords: " .. coords.x .. ", " .. coords.y .. ", " .. coords.z)
+    print("  Heading: " .. tostring(heading))
+
     local vehicle = CreateVehicle(model, coords.x, coords.y, coords.z, heading, true, true)
+    print("^3[DEBUG]^0 CreateVehicle returned: " .. tostring(vehicle))
 
     local timeout = 0
     while not DoesEntityExist(vehicle) and timeout < 100 do
         Wait(10)
         timeout = timeout + 1
     end
+
+    print("^3[DEBUG]^0 DoesEntityExist check - Timeout: " .. timeout .. "/100, Exists: " .. tostring(DoesEntityExist(vehicle)))
 
     if timeout >= 100 then
         return false, "Timeout during vehicle spawning"
