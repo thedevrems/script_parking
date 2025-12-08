@@ -274,8 +274,8 @@ function CreatePreviewZone()
 
             DrawText3D(coords.x, coords.y, coords.z + 1.0, controlsText)
 
-            -- Placer un point avec E
-            if IsControlJustPressed(0, 38) then -- E
+            -- Placer un point avec E (utiliser IsDisabledControlJustPressed car on a désactivé le contrôle)
+            if IsDisabledControlJustPressed(0, 38) then -- E
                 local newPoint = {
                     x = coords.x,
                     y = coords.y,
