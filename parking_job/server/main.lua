@@ -251,28 +251,22 @@ local function SpawnParkedVehicles()
             local propsVehicle = json.decode(dataVehicle.vehicle)
             local spawnCoords = vector3(parkingCoords.x, parkingCoords.y, parkingCoords.z)
 
-            if parkingCoords and propsVehicle and spawnCoords and parkingCoords.heading then
-                -- Déterminer le modèle à utiliser
-                -- Priorité : dataVehicle.model (nom string) > propsVehicle.model (hash)
-                local modelToSpawn = dataVehicle.model or propsVehicle.model
+            if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
+                local validVehicle, resultVehicle = SpawnVehicle(joaat(propsVehicle.model), spawnCoords, parkingCoords.heading)
 
-                if modelToSpawn then
-                    local validVehicle, resultVehicle = SpawnVehicle(modelToSpawn, spawnCoords, parkingCoords.heading)
+                if validVehicle and resultVehicle > 0 then
+                    -- Verrouiller le véhicule
+                    SetVehicleDoorsLocked(resultVehicle, 2)
 
-                    if validVehicle and resultVehicle > 0 then
-                        -- Verrouiller le véhicule
-                        SetVehicleDoorsLocked(resultVehicle, 2)
-
-                        local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
-                        if netId > 0 then
-                            table.insert(ParkedVehiclesNetIds, netId)
-                        end
-                    else
-                        print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
+                    local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
+                    if netId > 0 then
+                        table.insert(ParkedVehiclesNetIds, netId)
                     end
-
-                    Wait(100) -- Petite pause entre chaque spawn
+                else
+                    print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
                 end
+
+                Wait(100) -- Petite pause entre chaque spawn
             end
         end
 
