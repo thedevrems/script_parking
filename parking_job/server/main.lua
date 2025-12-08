@@ -169,7 +169,7 @@ lib.callback.register('parking_job:storeVehicle', function(source, plate, parkin
 
     -- Mettre à jour le véhicule dans la base de données avec ses coordonnées
     local garageName = Config.GaragePrefix .. parkingName
-    MySQL.update.await('UPDATE owned_vehicles SET garage = ?, jobGarage = ?, stored = 1, parking_coords = ? WHERE plate = ?', {
+    MySQL.update.await('UPDATE owned_vehicles SET garage = ?, jobGarage = ?, stored = TRUE, parking_coords = ? WHERE plate = ?', {
         garageName,
         parkingName,
         json.encode(vehicleCoords),
@@ -181,9 +181,6 @@ lib.callback.register('parking_job:storeVehicle', function(source, plate, parkin
 
     -- Synchroniser avec tous les clients
     TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
-
-    -- Retirer le véhicule du système de persistence de qs-advancedgarages
-    exports['qs-advancedgarages']:removeVehicleFromPersistent(plate)
 
     return true, 'vehicleStored'
 end)
@@ -221,7 +218,7 @@ lib.callback.register('parking_job:retrieveVehicle', function(source, plate, par
     end
 
     -- Mettre à jour le véhicule dans la base de données (le rendre "sorti")
-    MySQL.update.await('UPDATE owned_vehicles SET garage = ?, stored = 0, parking_coords = NULL WHERE plate = ?', {
+    MySQL.update.await('UPDATE owned_vehicles SET garage = ?, stored = FALSE, jobGarage = NULL, parking_coords = NULL WHERE plate = ?', {
         'OUT',
         plate
     })
@@ -243,32 +240,31 @@ end)
 -- Fonction pour spawn les véhicules garés
 local function SpawnParkedVehicles()
     -- Récupérer tous les véhicules garés (stored = 1)
-    local vehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage != "" AND stored = 1 AND parking_coords IS NOT NULL', {})
+    local dataVehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage != "" AND stored = TRUE AND parking_coords IS NOT NULL', {})
 
-    if vehicles then
-        for i = 1, #vehicles do
-            local vehicle = vehicles[i]
+    if dataVehicles then
+        for i = 1, #dataVehicles do
+            local dataVehicle = dataVehicles[i]
 
             -- Décoder les coordonnées de parking
-            local parkingCoords = json.decode(vehicle.parking_coords)
+            local parkingCoords = json.decode(dataVehicle.parking_coords)
+            local propsVehicle = json.decode(dataVehicle.vehicle)
+            local spawnCoords = vector3(parkingCoords.x, parkingCoords.y, parkingCoords.z)
 
-            if parkingCoords then
-                local spawnCoords = vector4(parkingCoords.x, parkingCoords.y, parkingCoords.z, parkingCoords.heading)
-                local vehicleProps = json.decode(vehicle.vehicle)
+            if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
+                -- local spawnCoords = vector4(parkingCoords.x, parkingCoords.y, parkingCoords.z, parkingCoords.heading)
+                -- local vehicleProps = json.decode(vehicle.vehicle)
+                
+                local validVehicle, resultVehicle = SpawnVehicle(propsVehicle.model, spawnCoords, parkingCoords.heading)
 
-                -- Utiliser l'export de qs-advancedgarages pour spawn le véhicule
-                local netId = exports['qs-advancedgarages']:SpawnVehicle(
-                    vehicle.id,
-                    vehicle.owner,
-                    vehicle.type,
-                    spawnCoords,
-                    vehicleProps,
-                    nil,
-                    false
-                )
-
-                if netId then
-                    table.insert(ParkedVehiclesNetIds, netId)
+                local netId
+                if validVehicle and resultVehicle > 0 then
+                    netId = NetworkGetNetworkIdFromEntity(resultVehicle)
+                    if netId then
+                        table.insert(ParkedVehiclesNetIds, netId)
+                    end
+                else 
+                    print(resultVehicle)
                 end
 
                 Wait(100) -- Petite pause entre chaque spawn
@@ -281,38 +277,6 @@ local function SpawnParkedVehicles()
         TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
     end
 end
-
--- Fonction pour donner les clés
-function GiveKeys(source, plate)
-    if Config.KeySystem == 'qs-vehiclekeys' then
-        exports['qs-vehiclekeys']:GiveKeys(plate, source, true)
-    elseif Config.KeySystem == 'qb-vehiclekeys' then
-        TriggerClientEvent('qb-vehiclekeys:client:AddKeys', source, plate)
-    elseif Config.KeySystem == 'wasabi_carlock' then
-        exports.wasabi_carlock:GiveKey(source, plate)
-    end
-end
-
--- Fonction pour retirer les clés
-function RemoveKeys(source, plate)
-    if Config.KeySystem == 'qs-vehiclekeys' then
-        exports['qs-vehiclekeys']:RemoveKeys(plate, source)
-    elseif Config.KeySystem == 'qb-vehiclekeys' then
-        TriggerClientEvent('qb-vehiclekeys:client:RemoveKeys', source, plate)
-    elseif Config.KeySystem == 'wasabi_carlock' then
-        exports.wasabi_carlock:RemoveKey(source, plate)
-    end
-end
-
--- Event pour donner les clés
-RegisterNetEvent('parking_job:giveKeys', function(plate)
-    GiveKeys(source, plate)
-end)
-
--- Event pour retirer les clés
-RegisterNetEvent('parking_job:removeKeys', function(plate)
-    RemoveKeys(source, plate)
-end)
 
 -- Event pour charger les parkings et véhicules au démarrage
 AddEventHandler('onResourceStart', function(resourceName)

@@ -54,7 +54,7 @@ exports.ox_target:addGlobalVehicle({
                     ParkedVehicles[vehicle] = netId
 
                     -- Retirer les clés
-                    TriggerServerEvent('parking_job:removeKeys', plate)
+                    exports['qs-vehiclekeys']:RemoveKeys(plate, GetDisplayNameFromVehicleModel(GetEntityModel(vehicle)))
 
                     -- Verrouiller le véhicule
                     SetVehicleDoorsLocked(vehicle, 2)
@@ -118,7 +118,7 @@ exports.ox_target:addGlobalVehicle({
                     ParkedVehicles[vehicle] = nil
 
                     -- Donner les clés
-                    TriggerServerEvent('parking_job:giveKeys', plate)
+                    exports['qs-vehiclekeys']:GiveKeys(plate, GetDisplayNameFromVehicleModel(GetEntityModel(vehicle)), true)
 
                     -- Déverrouiller le véhicule
                     SetVehicleDoorsLocked(vehicle, 1)
