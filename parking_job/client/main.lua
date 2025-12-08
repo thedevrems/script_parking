@@ -55,34 +55,26 @@ function CreateParkingZones()
 
         table.insert(ParkingZones, zone)
 
-        -- Calculer le centre du parking
-        local centerX, centerY, centerZ = 0, 0, 0
-        local pointCount = #parking.points
+        -- Ne créer un point de spawn que si le parking a des véhicules (optimisation : pas de points pour parkings vides)
+        if parking.center and parking.vehicleCount and parking.vehicleCount > 0 then
+            -- Distance adaptative selon le nombre de véhicules (optimisation : plus de véhicules = plus loin)
+            local distance = parking.spawnDistance or 1000.0
 
-        for i = 1, pointCount do
-            centerX = centerX + parking.points[i].x
-            centerY = centerY + parking.points[i].y
-            centerZ = centerZ + parking.points[i].z
+            -- Créer un point de détection pour le spawn
+            local spawnPoint = lib.points.new({
+                coords = vec3(parking.center.x, parking.center.y, parking.center.z),
+                distance = distance,
+                parkingName = parking.name,
+                onEnter = function(self)
+                    -- Demander au serveur de spawner les véhicules de ce parking
+                    TriggerServerEvent('parking_job:playerApproachingParking', self.parkingName)
+                    -- Retirer le point après utilisation (on n'a besoin de spawner qu'une fois)
+                    self:remove()
+                end
+            })
+
+            table.insert(ParkingSpawnPoints, spawnPoint)
         end
-
-        centerX = centerX / pointCount
-        centerY = centerY / pointCount
-        centerZ = centerZ / pointCount
-
-        -- Créer un point de détection à 1000m pour le spawn
-        local spawnPoint = lib.points.new({
-            coords = vec3(centerX, centerY, centerZ),
-            distance = 1000.0,
-            parkingName = parking.name,
-            onEnter = function(self)
-                -- Demander au serveur de spawner les véhicules de ce parking
-                TriggerServerEvent('parking_job:playerApproachingParking', self.parkingName)
-                -- Retirer le point après utilisation (on n'a besoin de spawner qu'une fois)
-                self:remove()
-            end
-        })
-
-        table.insert(ParkingSpawnPoints, spawnPoint)
     end
 end
 

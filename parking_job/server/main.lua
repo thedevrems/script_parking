@@ -29,12 +29,29 @@ local function LoadParkings()
         if result then
             for i = 1, #result do
                 local parking = result[i]
+                local points = json.decode(parking.points)
+
+                -- Calculer le centre du parking (optimisation : calculé une seule fois côté serveur)
+                local centerX, centerY, centerZ = 0, 0, 0
+                local pointCount = #points
+
+                for j = 1, pointCount do
+                    centerX = centerX + points[j].x
+                    centerY = centerY + points[j].y
+                    centerZ = centerZ + points[j].z
+                end
+
+                centerX = centerX / pointCount
+                centerY = centerY / pointCount
+                centerZ = centerZ / pointCount
+
                 JobParkings[parking.id] = {
                     id = parking.id,
                     name = parking.name,
                     job = parking.job,
-                    points = json.decode(parking.points),
-                    height = parking.height
+                    points = points,
+                    height = parking.height,
+                    center = {x = centerX, y = centerY, z = centerZ} -- Centre pré-calculé
                 }
             end
             print('^2[Job Parking]^0 Loaded ' .. #result .. ' parking(s)')
@@ -67,12 +84,27 @@ lib.callback.register('parking_job:createParking', function(source, data)
     })
 
     if insertId then
+        -- Calculer le centre du parking
+        local centerX, centerY, centerZ = 0, 0, 0
+        local pointCount = #data.points
+
+        for i = 1, pointCount do
+            centerX = centerX + data.points[i].x
+            centerY = centerY + data.points[i].y
+            centerZ = centerZ + data.points[i].z
+        end
+
+        centerX = centerX / pointCount
+        centerY = centerY / pointCount
+        centerZ = centerZ / pointCount
+
         JobParkings[insertId] = {
             id = insertId,
             name = data.name,
             job = data.job,
             points = data.points,
-            height = data.height
+            height = data.height,
+            center = {x = centerX, y = centerY, z = centerZ}
         }
 
         -- Notifier tous les clients
@@ -254,6 +286,26 @@ local function LoadParkedVehicles()
             end
 
             table.insert(VehiclesToSpawn[parkingName], vehicle)
+        end
+
+        -- Mettre à jour le nombre de véhicules par parking et calculer la distance adaptative
+        for id, parking in pairs(JobParkings) do
+            local count = #(VehiclesToSpawn[parking.name] or {})
+            parking.vehicleCount = count
+
+            -- Distance adaptative : plus de véhicules = détection plus loin (optimisation streaming)
+            -- 1 véhicule = 900m, 2-3 = 1000m, 4-5 = 1100m, 6+ = 1200m (max streaming)
+            if count == 0 then
+                parking.spawnDistance = 0 -- Pas de point créé
+            elseif count == 1 then
+                parking.spawnDistance = 900.0
+            elseif count <= 3 then
+                parking.spawnDistance = 1000.0
+            elseif count <= 5 then
+                parking.spawnDistance = 1100.0
+            else
+                parking.spawnDistance = 1200.0 -- Maximum pour rester dans les limites de streaming
+            end
         end
 
         print('^2[Job Parking]^0 Loaded ' .. #dataVehicles .. ' parked job vehicle(s) from database (grouped by parking)')
