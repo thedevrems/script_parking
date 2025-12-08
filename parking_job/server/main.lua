@@ -1,7 +1,7 @@
 local JobParkings = {}
 local ParkedVehiclesNetIds = {}
-local VehiclesToSpawn = {} -- Liste des véhicules à spawner (chargés depuis la DB)
-local VehiclesSpawned = false -- Flag pour savoir si les véhicules ont déjà été spawnés
+local VehiclesToSpawn = {} -- Liste des véhicules à spawner par parking : {parkingName = {véhicules}}
+local ParkingsSpawned = {} -- Flag par parking : {parkingName = true/false}
 
 -- Commande admin pour gérer les parkings (côté serveur pour sécurité)
 RegisterCommand(Config.AdminCommand, function(source, args, rawCommand)
@@ -243,27 +243,48 @@ local function LoadParkedVehicles()
     local dataVehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage != "" AND stored = TRUE AND parking_coords IS NOT NULL', {})
 
     if dataVehicles then
-        VehiclesToSpawn = dataVehicles
-        print('^2[Job Parking]^0 Loaded ' .. #dataVehicles .. ' parked job vehicle(s) from database (waiting for a player to spawn them)')
+        -- Grouper les véhicules par parking
+        for i = 1, #dataVehicles do
+            local vehicle = dataVehicles[i]
+            local parkingName = vehicle.jobGarage
+
+            if not VehiclesToSpawn[parkingName] then
+                VehiclesToSpawn[parkingName] = {}
+                ParkingsSpawned[parkingName] = false
+            end
+
+            table.insert(VehiclesToSpawn[parkingName], vehicle)
+        end
+
+        print('^2[Job Parking]^0 Loaded ' .. #dataVehicles .. ' parked job vehicle(s) from database (grouped by parking)')
     end
 end
 
--- Fonction pour spawn les véhicules garés (appelée quand un joueur se connecte)
-local function SpawnParkedVehicles()
-    if VehiclesSpawned then
-        print('^3[Job Parking]^0 Vehicles already spawned, skipping...')
+-- Fonction pour spawn les véhicules d'un parking spécifique (appelée quand un joueur entre dans la zone)
+local function SpawnParkingVehicles(parkingName)
+    if not parkingName then
+        print('^1[Job Parking Error]^0 No parking name provided')
         return
     end
 
-    if #VehiclesToSpawn == 0 then
-        print('^3[Job Parking]^0 No vehicles to spawn')
+    -- Vérifier si les véhicules de ce parking ont déjà été spawnés
+    if ParkingsSpawned[parkingName] then
+        print('^3[Job Parking]^0 Vehicles for parking "' .. parkingName .. '" already spawned, skipping...')
         return
     end
 
-    print('^2[Job Parking]^0 Spawning ' .. #VehiclesToSpawn .. ' parked job vehicle(s)...')
+    -- Vérifier s'il y a des véhicules à spawner pour ce parking
+    if not VehiclesToSpawn[parkingName] or #VehiclesToSpawn[parkingName] == 0 then
+        print('^3[Job Parking]^0 No vehicles to spawn for parking "' .. parkingName .. '"')
+        ParkingsSpawned[parkingName] = true
+        return
+    end
 
-    for i = 1, #VehiclesToSpawn do
-        local dataVehicle = VehiclesToSpawn[i]
+    local vehicleCount = #VehiclesToSpawn[parkingName]
+    print('^2[Job Parking]^0 Spawning ' .. vehicleCount .. ' vehicle(s) for parking "' .. parkingName .. '"...')
+
+    for i = 1, vehicleCount do
+        local dataVehicle = VehiclesToSpawn[parkingName][i]
 
         -- Décoder les coordonnées de parking
         local parkingCoords = json.decode(dataVehicle.parking_coords)
@@ -301,8 +322,9 @@ local function SpawnParkedVehicles()
         end
     end
 
-    VehiclesSpawned = true
-    print('^2[Job Parking]^0 Finished spawning vehicles')
+    -- Marquer ce parking comme "véhicules déjà spawnés"
+    ParkingsSpawned[parkingName] = true
+    print('^2[Job Parking]^0 Finished spawning vehicles for parking "' .. parkingName .. '"')
 
     -- Envoyer les netIds aux clients
     TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
@@ -327,20 +349,23 @@ end)
 
 -- Event pour envoyer les parkings aux joueurs qui se connectent
 RegisterNetEvent('esx:playerLoaded', function(playerId, xPlayer)
-    -- Spawner les véhicules garés quand le premier joueur se connecte
-    if not VehiclesSpawned then
-        CreateThread(function()
-            Wait(2000) -- Attendre que le joueur soit complètement chargé
-            SpawnParkedVehicles()
-        end)
-    end
-
     -- Envoyer les parkings au joueur
     TriggerClientEvent('parking_job:updateParkings', playerId, JobParkings)
 
     -- Envoyer aussi la liste des véhicules garés
     Wait(1000)
     TriggerClientEvent('parking_job:syncParkedVehicles', playerId, ParkedVehiclesNetIds)
+end)
+
+-- Event appelé par le client quand un joueur entre dans une zone de parking
+RegisterNetEvent('parking_job:playerEnteredParking', function(parkingName)
+    if not parkingName then return end
+
+    -- Spawner les véhicules de ce parking si ce n'est pas déjà fait
+    CreateThread(function()
+        Wait(500) -- Petite attente pour que le joueur soit bien dans la zone
+        SpawnParkingVehicles(parkingName)
+    end)
 end)
 
 -- Note: Les vérifications de job se font côté serveur dans les callbacks

@@ -37,6 +37,9 @@ function CreateParkingZones()
             debug = Config.Debug,
             onEnter = function()
                 CurrentParking = parking
+
+                -- Déclencher l'event serveur pour spawner les véhicules de ce parking
+                TriggerServerEvent('parking_job:playerEnteredParking', parking.name)
             end,
             onExit = function()
                 if CurrentParking and CurrentParking.id == parking.id then
