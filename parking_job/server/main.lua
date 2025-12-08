@@ -250,26 +250,23 @@ local function SpawnParkedVehicles()
             local spawnCoords = vector3(parkingCoords.x, parkingCoords.y, parkingCoords.z)
 
             if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
-                local modelVehicle = GetVehicleModelName(propsVehicle.model)
+                -- Utiliser directement le hash du modèle (pas de GetVehicleModelName car c'est client-side)
+                local validVehicle, resultVehicle = TrySpawnVehicle(propsVehicle.model, spawnCoords, parkingCoords.heading, 2)
 
-                if modelVehicle and modelVehicle ~= "unknown" then
-                    local validVehicle, resultVehicle = TrySpawnVehicle(modelVehicle, spawnCoords, parkingCoords.heading, 2)
+                if validVehicle and resultVehicle > 0 then
+                    -- Verrouiller le véhicule
+                    SetVehicleDoorsLocked(resultVehicle, 2)
 
-                    if validVehicle and resultVehicle > 0 then
-                        -- Verrouiller le véhicule
-                        SetVehicleDoorsLocked(resultVehicle, 2)
-
-                        local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
-                        if netId > 0 then
-                            table.insert(ParkedVehiclesNetIds, netId)
-                        end
-                        print("Véhicule a bien spawn")
-                    else
-                        print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
+                    local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
+                    if netId > 0 then
+                        table.insert(ParkedVehiclesNetIds, netId)
                     end
-
-                    Wait(100) -- Petite pause entre chaque spawn 
+                    print("Véhicule a bien spawn")
+                else
+                    print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
                 end
+
+                Wait(100) -- Petite pause entre chaque spawn
             end
         end
         print('^2[Job Parking]^0 Spawned ' .. #dataVehicles .. ' parked job vehicle(s)')
