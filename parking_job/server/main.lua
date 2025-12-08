@@ -357,13 +357,12 @@ RegisterNetEvent('esx:playerLoaded', function(playerId, xPlayer)
     TriggerClientEvent('parking_job:syncParkedVehicles', playerId, ParkedVehiclesNetIds)
 end)
 
--- Event appelé par le client quand un joueur entre dans une zone de parking
-RegisterNetEvent('parking_job:playerEnteredParking', function(parkingName)
+-- Event appelé par le client quand un joueur s'approche d'un parking (~1000m)
+RegisterNetEvent('parking_job:playerApproachingParking', function(parkingName)
     if not parkingName then return end
 
     -- Spawner les véhicules de ce parking si ce n'est pas déjà fait
     CreateThread(function()
-        Wait(500) -- Petite attente pour que le joueur soit bien dans la zone
         SpawnParkingVehicles(parkingName)
     end)
 end)

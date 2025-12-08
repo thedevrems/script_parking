@@ -2,6 +2,7 @@ local JobParkings = {}
 local ParkingZones = {}
 CurrentParking = nil -- Variable globale accessible depuis target.lua
 local InCreationMode = false
+local ParkingsSpawnRequested = {} -- Flag local pour savoir si on a déjà demandé le spawn pour un parking
 local CreationData = {
     points = {},
     height = 2.0,
@@ -37,9 +38,6 @@ function CreateParkingZones()
             debug = Config.Debug,
             onEnter = function()
                 CurrentParking = parking
-
-                -- Déclencher l'event serveur pour spawner les véhicules de ce parking
-                TriggerServerEvent('parking_job:playerEnteredParking', parking.name)
             end,
             onExit = function()
                 if CurrentParking and CurrentParking.id == parking.id then
@@ -480,6 +478,44 @@ function DrawText3D(x, y, z, text)
         DrawText(_x, _y)
     end
 end
+
+-- Thread pour détecter quand le joueur s'approche d'un parking et demander le spawn des véhicules
+CreateThread(function()
+    while true do
+        Wait(5000) -- Vérifier toutes les 5 secondes
+
+        local playerCoords = GetEntityCoords(PlayerPedId())
+
+        for id, parking in pairs(JobParkings) do
+            -- Vérifier si on a déjà demandé le spawn pour ce parking
+            if not ParkingsSpawnRequested[parking.name] then
+                -- Calculer le centre du parking (moyenne des points)
+                local centerX, centerY, centerZ = 0, 0, 0
+                local pointCount = #parking.points
+
+                for i = 1, pointCount do
+                    centerX = centerX + parking.points[i].x
+                    centerY = centerY + parking.points[i].y
+                    centerZ = centerZ + parking.points[i].z
+                end
+
+                centerX = centerX / pointCount
+                centerY = centerY / pointCount
+                centerZ = centerZ / pointCount
+
+                local parkingCenter = vector3(centerX, centerY, centerZ)
+                local distance = #(playerCoords - parkingCenter)
+
+                -- Si le joueur est à moins de 1000m du parking
+                if distance < 1000.0 then
+                    -- Demander au serveur de spawner les véhicules de ce parking
+                    TriggerServerEvent('parking_job:playerApproachingParking', parking.name)
+                    ParkingsSpawnRequested[parking.name] = true
+                end
+            end
+        end
+    end
+end)
 
 -- Les parkings sont chargés automatiquement via l'événement 'parking_job:updateParkings'
 -- envoyé par le serveur au démarrage de la ressource et à la connexion du joueur
