@@ -257,10 +257,9 @@ local function SpawnParkedVehicles()
                 
                 local validVehicle, resultVehicle = SpawnVehicle(propsVehicle.model, spawnCoords, parkingCoords.heading)
 
-                local netId
                 if validVehicle and resultVehicle > 0 then
-                    netId = NetworkGetNetworkIdFromEntity(resultVehicle)
-                    if netId then
+                    local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
+                    if netId > 0 then
                         table.insert(ParkedVehiclesNetIds, netId)
                     end
                 else 
