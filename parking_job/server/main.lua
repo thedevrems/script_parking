@@ -250,20 +250,26 @@ local function SpawnParkedVehicles()
             local spawnCoords = vector3(parkingCoords.x, parkingCoords.y, parkingCoords.z)
 
             if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
-                -- Utiliser directement le hash du modèle (pas de GetVehicleModelName car c'est client-side)
-                local validVehicle, resultVehicle = TrySpawnVehicle(propsVehicle.model, spawnCoords, parkingCoords.heading, 2)
+                -- Convertir le hash du modèle en nom de modèle (string) car CreateVehicle côté serveur n'accepte que les strings
+                local modelName = GetVehicleModelName(propsVehicle.model)
 
-                if validVehicle and resultVehicle > 0 then
-                    -- Verrouiller le véhicule
-                    SetVehicleDoorsLocked(resultVehicle, 2)
-
-                    local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
-                    if netId > 0 then
-                        table.insert(ParkedVehiclesNetIds, netId)
-                    end
-                    print("Véhicule a bien spawn")
+                if modelName == "unknown" then
+                    print('^1[Job Parking Error]^0 Unknown vehicle model hash: ' .. tostring(propsVehicle.model))
                 else
-                    print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
+                    local validVehicle, resultVehicle = TrySpawnVehicle(modelName, spawnCoords, parkingCoords.heading, 2)
+
+                    if validVehicle and resultVehicle > 0 then
+                        -- Verrouiller le véhicule
+                        SetVehicleDoorsLocked(resultVehicle, 2)
+
+                        local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
+                        if netId > 0 then
+                            table.insert(ParkedVehiclesNetIds, netId)
+                        end
+                        print("Véhicule a bien spawn")
+                    else
+                        print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
+                    end
                 end
 
                 Wait(100) -- Petite pause entre chaque spawn
