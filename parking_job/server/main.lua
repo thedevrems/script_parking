@@ -27,34 +27,42 @@ end, false)
 local function LoadParkings()
     MySQL.query('SELECT * FROM job_parkings', {}, function(result)
         if result then
+            local loadedCount = 0
             for i = 1, #result do
                 local parking = result[i]
                 local points = json.decode(parking.points)
 
-                -- Calculer le centre du parking (optimisation : calculé une seule fois côté serveur)
-                local centerX, centerY, centerZ = 0, 0, 0
-                local pointCount = #points
+                -- Vérifier que le JSON est valide
+                if not points or type(points) ~= 'table' or #points == 0 then
+                    print('^1[Job Parking] ERREUR: JSON invalide pour le parking "' .. parking.name .. '" (ID: ' .. parking.id .. ')^0')
+                    print('^3[Job Parking] Corrigez le parking dans la base de données et relancez le script^0')
+                else
+                    -- Calculer le centre du parking (optimisation : calculé une seule fois côté serveur)
+                    local centerX, centerY, centerZ = 0, 0, 0
+                    local pointCount = #points
 
-                for j = 1, pointCount do
-                    centerX = centerX + points[j].x
-                    centerY = centerY + points[j].y
-                    centerZ = centerZ + points[j].z
+                    for j = 1, pointCount do
+                        centerX = centerX + points[j].x
+                        centerY = centerY + points[j].y
+                        centerZ = centerZ + points[j].z
+                    end
+
+                    centerX = centerX / pointCount
+                    centerY = centerY / pointCount
+                    centerZ = centerZ / pointCount
+
+                    JobParkings[parking.id] = {
+                        id = parking.id,
+                        name = parking.name,
+                        job = parking.job,
+                        points = points,
+                        height = parking.height,
+                        center = {x = centerX, y = centerY, z = centerZ} -- Centre pré-calculé
+                    }
+                    loadedCount = loadedCount + 1
                 end
-
-                centerX = centerX / pointCount
-                centerY = centerY / pointCount
-                centerZ = centerZ / pointCount
-
-                JobParkings[parking.id] = {
-                    id = parking.id,
-                    name = parking.name,
-                    job = parking.job,
-                    points = points,
-                    height = parking.height,
-                    center = {x = centerX, y = centerY, z = centerZ} -- Centre pré-calculé
-                }
             end
-            print('^2[Job Parking]^0 Loaded ' .. #result .. ' parking(s)')
+            print('^2[Job Parking]^0 Loaded ' .. loadedCount .. ' parking(s) (' .. (#result - loadedCount) .. ' skipped due to errors)')
         end
     end)
 end
