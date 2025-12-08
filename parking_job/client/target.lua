@@ -48,30 +48,30 @@ exports.ox_target:addGlobalVehicle({
             local netId = NetworkGetNetworkIdFromEntity(vehicle)
 
             -- Garer le véhicule
-            lib.callback('parking_job:storeVehicle', false, function(success, message)
-                if success then
-                    -- Marquer le véhicule comme garé
-                    ParkedVehicles[vehicle] = netId
+            local success, message = lib.callback.await('parking_job:storeVehicle', false, plate, CurrentParking.name, vehicleCoords, netId)
 
-                    -- Retirer les clés
-                    exports['qs-vehiclekeys']:RemoveKeys(plate, GetDisplayNameFromVehicleModel(GetEntityModel(vehicle)))
+            if success then
+                -- Marquer le véhicule comme garé
+                ParkedVehicles[vehicle] = netId
 
-                    -- Verrouiller le véhicule
-                    SetVehicleDoorsLocked(vehicle, 2)
+                -- Retirer les clés
+                exports['qs-vehiclekeys']:RemoveKeys(plate, GetDisplayNameFromVehicleModel(GetEntityModel(vehicle)))
 
-                    lib.notify({
-                        title = 'Succès',
-                        description = Config.Notifications[message],
-                        type = 'success'
-                    })
-                else
-                    lib.notify({
-                        title = 'Erreur',
-                        description = Config.Notifications[message],
-                        type = 'error'
-                    })
-                end
-            end, plate, CurrentParking.name, vehicleCoords, netId)
+                -- Verrouiller le véhicule
+                SetVehicleDoorsLocked(vehicle, 2)
+
+                lib.notify({
+                    title = 'Succès',
+                    description = Config.Notifications[message],
+                    type = 'success'
+                })
+            else
+                lib.notify({
+                    title = 'Erreur',
+                    description = Config.Notifications[message],
+                    type = 'error'
+                })
+            end
         end
     }
 })
@@ -112,30 +112,30 @@ exports.ox_target:addGlobalVehicle({
             local netId = ParkedVehicles[vehicle]
 
             -- Récupérer le véhicule
-            lib.callback('parking_job:retrieveVehicle', false, function(success, message)
-                if success then
-                    -- Retirer de la liste des véhicules garés
-                    ParkedVehicles[vehicle] = nil
+            local success, message = lib.callback.await('parking_job:retrieveVehicle', false, plate, CurrentParking.job, netId)
 
-                    -- Donner les clés
-                    exports['qs-vehiclekeys']:GiveKeys(plate, GetDisplayNameFromVehicleModel(GetEntityModel(vehicle)), true)
+            if success then
+                -- Retirer de la liste des véhicules garés
+                ParkedVehicles[vehicle] = nil
 
-                    -- Déverrouiller le véhicule
-                    SetVehicleDoorsLocked(vehicle, 1)
+                -- Donner les clés
+                exports['qs-vehiclekeys']:GiveKeys(plate, GetDisplayNameFromVehicleModel(GetEntityModel(vehicle)), true)
 
-                    lib.notify({
-                        title = 'Succès',
-                        description = Config.Notifications[message],
-                        type = 'success'
-                    })
-                else
-                    lib.notify({
-                        title = 'Erreur',
-                        description = Config.Notifications[message],
-                        type = 'error'
-                    })
-                end
-            end, plate, CurrentParking.job, netId)
+                -- Déverrouiller le véhicule
+                SetVehicleDoorsLocked(vehicle, 1)
+
+                lib.notify({
+                    title = 'Succès',
+                    description = Config.Notifications[message],
+                    type = 'success'
+                })
+            else
+                lib.notify({
+                    title = 'Erreur',
+                    description = Config.Notifications[message],
+                    type = 'error'
+                })
+            end
         end
     }
 })

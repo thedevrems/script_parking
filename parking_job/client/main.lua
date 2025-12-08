@@ -80,10 +80,11 @@ end
 
 -- Event pour ouvrir le menu admin (envoyé par le serveur après vérification des permissions)
 RegisterNetEvent('parking_job:openAdminMenu', function()
-    lib.callback('parking_job:getParkings', false, function(parkings)
+    local parkings = lib.callback.await('parking_job:getParkings', false)
+    if parkings then
         JobParkings = parkings
         OpenAdminMenu()
-    end)
+    end
 end)
 
 -- Menu admin
@@ -142,22 +143,22 @@ function OpenParkingOptions(parking)
                 })
 
                 if confirm == 'confirm' then
-                    lib.callback('parking_job:deleteParking', false, function(success, message)
-                        if success then
-                            lib.notify({
-                                title = 'Succès',
-                                description = Config.Notifications[message],
-                                type = 'success'
-                            })
-                            OpenAdminMenu()
-                        else
-                            lib.notify({
-                                title = 'Erreur',
-                                description = Config.Notifications[message],
-                                type = 'error'
-                            })
-                        end
-                    end, parking.id)
+                    local success, message = lib.callback.await('parking_job:deleteParking', false, parking.id)
+
+                    if success then
+                        lib.notify({
+                            title = 'Succès',
+                            description = Config.Notifications[message],
+                            type = 'success'
+                        })
+                        OpenAdminMenu()
+                    else
+                        lib.notify({
+                            title = 'Erreur',
+                            description = Config.Notifications[message],
+                            type = 'error'
+                        })
+                    end
                 end
             end
         },
@@ -199,55 +200,55 @@ function StartParkingCreation()
     CreationData.name = input[1]
 
     -- Récupérer la liste des jobs
-    lib.callback('parking_job:getJobs', false, function(jobs)
-        local jobOptions = {}
+    local jobs = lib.callback.await('parking_job:getJobs', false)
+    if not jobs then return end
 
-        for i = 1, #jobs do
-            table.insert(jobOptions, {
-                value = jobs[i].name,
-                label = jobs[i].label
-            })
-        end
-
-        -- Demander le job et la hauteur
-        local input2 = lib.inputDialog('Sélectionner le job', {
-            {
-                type = 'select',
-                label = 'Job',
-                description = 'Job autorisé pour ce parking',
-                required = true,
-                options = jobOptions
-            },
-            {
-                type = 'number',
-                label = 'Hauteur (Z)',
-                description = 'Hauteur de la zone en mètres',
-                required = true,
-                default = 2.0,
-                min = 1.0,
-                max = 10.0
-            }
+    local jobOptions = {}
+    for i = 1, #jobs do
+        table.insert(jobOptions, {
+            value = jobs[i].name,
+            label = jobs[i].label
         })
+    end
 
-        if not input2 then return end
+    -- Demander le job et la hauteur
+    local input2 = lib.inputDialog('Sélectionner le job', {
+        {
+            type = 'select',
+            label = 'Job',
+            description = 'Job autorisé pour ce parking',
+            required = true,
+            options = jobOptions
+        },
+        {
+            type = 'number',
+            label = 'Hauteur (Z)',
+            description = 'Hauteur de la zone en mètres',
+            required = true,
+            default = 2.0,
+            min = 1.0,
+            max = 10.0
+        }
+    })
 
-        CreationData.job = input2[1]
-        CreationData.height = input2[2]
-        CreationData.points = {}
+    if not input2 then return end
 
-        -- Démarrer le mode création
-        InCreationMode = true
+    CreationData.job = input2[1]
+    CreationData.height = input2[2]
+    CreationData.points = {}
 
-        -- Créer une zone de prévisualisation
-        CreatePreviewZone()
+    -- Démarrer le mode création
+    InCreationMode = true
 
-        lib.notify({
-            title = 'Mode création activé',
-            description = 'E: Placer | SUPPR: Retirer | ↑/↓: Hauteur | ENTER: Valider | BACKSPACE: Annuler',
-            type = 'info',
-            duration = 10000
-        })
-    end)
+    -- Créer une zone de prévisualisation
+    CreatePreviewZone()
+
+    lib.notify({
+        title = 'Mode création activé',
+        description = 'E: Placer | SUPPR: Retirer | ↑/↓: Hauteur | ENTER: Valider | BACKSPACE: Annuler',
+        type = 'info',
+        duration = 10000
+    })
 end
 
 -- Créer une zone de prévisualisation
@@ -414,22 +415,22 @@ function CreatePreviewZone()
                     end
 
                     -- Envoyer au serveur
-                    lib.callback('parking_job:createParking', false, function(success, message)
-                        if success then
-                            lib.notify({
-                                title = 'Succès',
-                                description = Config.Notifications[message] .. ' (' .. #CreationData.points .. ' points, hauteur: ' .. CreationData.height .. 'm)',
-                                type = 'success',
-                                duration = 5000
-                            })
-                        else
-                            lib.notify({
-                                title = 'Erreur',
-                                description = Config.Notifications[message],
-                                type = 'error'
-                            })
-                        end
-                    end, CreationData)
+                    local success, message = lib.callback.await('parking_job:createParking', false, CreationData)
+
+                    if success then
+                        lib.notify({
+                            title = 'Succès',
+                            description = Config.Notifications[message] .. ' (' .. #CreationData.points .. ' points, hauteur: ' .. CreationData.height .. 'm)',
+                            type = 'success',
+                            duration = 5000
+                        })
+                    else
+                        lib.notify({
+                            title = 'Erreur',
+                            description = Config.Notifications[message],
+                            type = 'error'
+                        })
+                    end
 
                     CreationData = {points = {}, height = 2.0, job = nil, name = nil}
                 end
