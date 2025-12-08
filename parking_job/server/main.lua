@@ -1,5 +1,7 @@
 local JobParkings = {}
 local ParkedVehiclesNetIds = {}
+local VehiclesToSpawn = {} -- Liste des véhicules à spawner (chargés depuis la DB)
+local VehiclesSpawned = false -- Flag pour savoir si les véhicules ont déjà été spawnés
 
 -- Commande admin pour gérer les parkings (côté serveur pour sécurité)
 RegisterCommand(Config.AdminCommand, function(source, args, rawCommand)
@@ -235,52 +237,75 @@ lib.callback.register('parking_job:retrieveVehicle', function(source, plate, par
     return true, 'vehicleRetrieved'
 end)
 
--- Fonction pour spawn les véhicules garés
-local function SpawnParkedVehicles()
+-- Fonction pour charger les véhicules garés depuis la DB (ne les spawn pas encore)
+local function LoadParkedVehicles()
     -- Récupérer tous les véhicules garés (stored = 1)
     local dataVehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE jobGarage != "" AND stored = TRUE AND parking_coords IS NOT NULL', {})
 
     if dataVehicles then
-        for i = 1, #dataVehicles do
-            local dataVehicle = dataVehicles[i]
-
-            -- Décoder les coordonnées de parking
-            local parkingCoords = json.decode(dataVehicle.parking_coords)
-            local propsVehicle = json.decode(dataVehicle.vehicle)
-            local spawnCoords = vector3(parkingCoords.x, parkingCoords.y, parkingCoords.z)
-
-            if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
-                -- Convertir le hash du modèle en nom de modèle (string) car CreateVehicle côté serveur n'accepte que les strings
-                local modelName = GetVehicleModelName(propsVehicle.model)
-                print("^3[DEBUG]^0 Hash: " .. tostring(propsVehicle.model) .. " -> ModelName: " .. tostring(modelName))
-
-                if modelName == "unknown" then
-                    print('^1[Job Parking Error]^0 Unknown vehicle model hash: ' .. tostring(propsVehicle.model))
-                else
-                    local validVehicle, resultVehicle = TrySpawnVehicle(modelName, spawnCoords, parkingCoords.heading, 2)
-
-                    if validVehicle and resultVehicle > 0 then
-                        -- Verrouiller le véhicule
-                        SetVehicleDoorsLocked(resultVehicle, 2)
-
-                        local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
-                        if netId > 0 then
-                            table.insert(ParkedVehiclesNetIds, netId)
-                        end
-                        print("Véhicule a bien spawn")
-                    else
-                        print('^1[Job Parking Error]^0 Failed to spawn vehicle: ' .. tostring(resultVehicle))
-                    end
-                end
-
-                Wait(100) -- Petite pause entre chaque spawn
-            end
-        end
-        print('^2[Job Parking]^0 Spawned ' .. #dataVehicles .. ' parked job vehicle(s)')
-
-        -- Envoyer les netIds aux clients
-        TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
+        VehiclesToSpawn = dataVehicles
+        print('^2[Job Parking]^0 Loaded ' .. #dataVehicles .. ' parked job vehicle(s) from database (waiting for a player to spawn them)')
     end
+end
+
+-- Fonction pour spawn les véhicules garés (appelée quand un joueur se connecte)
+local function SpawnParkedVehicles()
+    if VehiclesSpawned then
+        print('^3[Job Parking]^0 Vehicles already spawned, skipping...')
+        return
+    end
+
+    if #VehiclesToSpawn == 0 then
+        print('^3[Job Parking]^0 No vehicles to spawn')
+        return
+    end
+
+    print('^2[Job Parking]^0 Spawning ' .. #VehiclesToSpawn .. ' parked job vehicle(s)...')
+
+    for i = 1, #VehiclesToSpawn do
+        local dataVehicle = VehiclesToSpawn[i]
+
+        -- Décoder les coordonnées de parking
+        local parkingCoords = json.decode(dataVehicle.parking_coords)
+        local propsVehicle = json.decode(dataVehicle.vehicle)
+        local spawnCoords = vector3(parkingCoords.x, parkingCoords.y, parkingCoords.z)
+
+        if parkingCoords and propsVehicle and propsVehicle.model and spawnCoords and parkingCoords.heading then
+            -- Convertir le hash du modèle en nom de modèle (string)
+            local modelName = GetVehicleModelName(propsVehicle.model)
+
+            if modelName == "unknown" then
+                print('^1[Job Parking Error]^0 Unknown vehicle model hash: ' .. tostring(propsVehicle.model))
+            else
+                local validVehicle, resultVehicle = TrySpawnVehicle(modelName, spawnCoords, parkingCoords.heading, 2)
+
+                if validVehicle and resultVehicle > 0 then
+                    -- Verrouiller le véhicule
+                    SetVehicleDoorsLocked(resultVehicle, 2)
+
+                    local netId = NetworkGetNetworkIdFromEntity(resultVehicle)
+                    if netId > 0 then
+                        -- Ajouter à la liste des véhicules garés
+                        table.insert(ParkedVehiclesNetIds, netId)
+
+                        -- Rendre le véhicule persistant avec qs-advancedgarages
+                        exports['qs-advancedgarages']:setVehicleToPersistent(netId)
+                    end
+                    print("^2[Job Parking]^0 Vehicle spawned successfully (plate: " .. dataVehicle.plate .. ")")
+                else
+                    print('^1[Job Parking Error]^0 Failed to spawn vehicle (plate: ' .. dataVehicle.plate .. '): ' .. tostring(resultVehicle))
+                end
+            end
+
+            Wait(100) -- Petite pause entre chaque spawn
+        end
+    end
+
+    VehiclesSpawned = true
+    print('^2[Job Parking]^0 Finished spawning vehicles')
+
+    -- Envoyer les netIds aux clients
+    TriggerClientEvent('parking_job:syncParkedVehicles', -1, ParkedVehiclesNetIds)
 end
 
 -- Event pour charger les parkings et véhicules au démarrage
@@ -290,9 +315,9 @@ AddEventHandler('onResourceStart', function(resourceName)
         Wait(1000)
         LoadParkings()
 
-        -- Attendre que les autres ressources soient chargées puis spawner les véhicules
-        Wait(4000)
-        SpawnParkedVehicles()
+        -- Charger les véhicules depuis la DB (mais ne pas les spawner encore)
+        Wait(1000)
+        LoadParkedVehicles()
 
         -- Envoyer les parkings aux clients déjà connectés
         Wait(1000)
@@ -302,6 +327,15 @@ end)
 
 -- Event pour envoyer les parkings aux joueurs qui se connectent
 RegisterNetEvent('esx:playerLoaded', function(playerId, xPlayer)
+    -- Spawner les véhicules garés quand le premier joueur se connecte
+    if not VehiclesSpawned then
+        CreateThread(function()
+            Wait(2000) -- Attendre que le joueur soit complètement chargé
+            SpawnParkedVehicles()
+        end)
+    end
+
+    -- Envoyer les parkings au joueur
     TriggerClientEvent('parking_job:updateParkings', playerId, JobParkings)
 
     -- Envoyer aussi la liste des véhicules garés
